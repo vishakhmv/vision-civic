@@ -1,0 +1,52 @@
+# ==========================================================
+# Backend Git Ignore Configuration
+# ==========================================================
+
+# --- Environment Variables & Secrets ---
+.env
+.env.*
+*.env
+!.env.example
+
+# --- Python Virtual Environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Python Caching & Testing ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Temporary Media & Upload Folders ---
+temp_media/
+static_media/
+temp_videos/
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# --- Model Weights & Large Files ---
+saved_clip_model/
+**/saved_clip_model/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# --- Logs & OS Files ---
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

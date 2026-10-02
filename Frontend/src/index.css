@@ -1,0 +1,320 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   VISION CIVIC — CIVIC-TECH DESIGN SYSTEM (TAILWIND + TOKENS)
+   Deep Navy | Teal/Cyan Accent | Slate & White Surfaces
+   Supports: Light Mode, Dark Mode, System Mode
+   ========================================================= */
+
+:root,
+[data-theme="dark"] {
+  --bg-primary: #0a1128;
+  --bg-secondary: #0f1936;
+  --bg-card: rgba(17, 28, 58, 0.78);
+  --bg-card-hover: rgba(24, 40, 80, 0.88);
+  --bg-surface: #14234b;
+  --bg-input: rgba(10, 17, 40, 0.85);
+
+  --border-subtle: rgba(148, 163, 184, 0.16);
+  --border-hover: rgba(6, 182, 212, 0.35);
+  --border-glow: rgba(6, 182, 212, 0.3);
+
+  /* Civic Teal / Cyan Brand Accents */
+  --primary: #0891b2;
+  --primary-hover: #06b6d4;
+  --primary-glow: rgba(6, 182, 212, 0.35);
+  --primary-text: #ffffff;
+
+  --accent-teal: #06b6d4;
+  --accent-cyan: #22d3ee;
+  --accent-navy: #0b193d;
+
+  /* Alert Severity */
+  --fire: #ef4444;
+  --fire-bg: rgba(239, 68, 68, 0.15);
+  --smoke: #94a3b8;
+  --smoke-bg: rgba(148, 163, 184, 0.15);
+  --waste: #10b981;
+  --waste-bg: rgba(16, 185, 129, 0.15);
+
+  --live-color: #06b6d4;
+  --upload-color: #0ea5e9;
+
+  /* Typography */
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 25px rgba(6, 182, 212, 0.25);
+  --modal-bg: #0d1633;
+  --modal-header-bg: #091026;
+  --modal-footer-bg: #091026;
+  --modal-backdrop: rgba(4, 8, 20, 0.85);
+  --table-hover: rgba(6, 182, 212, 0.05);
+}
+
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.94);
+  --bg-card-hover: #f1f5f9;
+  --bg-surface: #f1f5f9;
+  --bg-input: #ffffff;
+
+  --border-subtle: rgba(203, 213, 225, 0.9);
+  --border-hover: rgba(8, 145, 178, 0.5);
+  --border-glow: rgba(8, 145, 178, 0.25);
+
+  /* Civic Teal / Cyan Brand Accents */
+  --primary: #0891b2;
+  --primary-hover: #0e7490;
+  --primary-glow: rgba(8, 145, 178, 0.25);
+  --primary-text: #ffffff;
+
+  --accent-teal: #0891b2;
+  --accent-cyan: #0284c7;
+  --accent-navy: #1e293b;
+
+  /* Alert Severity */
+  --fire: #dc2626;
+  --fire-bg: rgba(239, 68, 68, 0.12);
+  --smoke: #64748b;
+  --smoke-bg: rgba(100, 116, 139, 0.12);
+  --waste: #059669;
+  --waste-bg: rgba(16, 185, 129, 0.12);
+
+  --live-color: #0891b2;
+  --upload-color: #0284c7;
+
+  /* Typography */
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #64748b;
+
+  --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.08);
+  --shadow-glow: 0 0 15px rgba(8, 145, 178, 0.15);
+  --modal-bg: #ffffff;
+  --modal-header-bg: #f8fafc;
+  --modal-footer-bg: #f8fafc;
+  --modal-backdrop: rgba(15, 23, 42, 0.55);
+  --table-hover: rgba(8, 145, 178, 0.05);
+}
+
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    background-color: var(--bg-primary);
+    color: var(--text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-main);
+  }
+
+  input, select, textarea {
+    font-family: var(--font-body);
+    outline: none;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-input);
+    color: var(--text-main);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 1rem;
+    transition: all 0.2s ease;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+  }
+}
+
+@layer components {
+  /* Glassmorphism Panel */
+  .glass-panel {
+    background: var(--bg-card);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  /* Civic Tech Buttons */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 font-semibold text-white transition-all duration-200 cursor-pointer;
+    background: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
+    padding: 0.75rem 1.4rem;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 14px var(--primary-glow);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(6, 182, 212, 0.45);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 font-semibold text-white transition-all duration-200 cursor-pointer;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    padding: 0.65rem 1.25rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center gap-2 font-medium transition-all duration-200 cursor-pointer;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-main);
+    padding: 0.65rem 1.25rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-outline:hover {
+    background: var(--bg-surface);
+    border-color: var(--border-hover);
+  }
+
+  /* Google OAuth Button */
+  .btn-google {
+    @apply inline-flex items-center justify-center gap-3 w-full font-semibold transition-all duration-200 cursor-pointer;
+    background: var(--bg-surface);
+    color: var(--text-main);
+    border: 1px solid var(--border-subtle);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-google:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 uppercase font-bold tracking-wider;
+    padding: 0.28rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+  }
+
+  .badge-fire {
+    background: var(--fire-bg);
+    color: var(--fire);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .badge-smoke {
+    background: var(--smoke-bg);
+    color: var(--smoke);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+
+  .badge-waste {
+    background: var(--waste-bg);
+    color: var(--waste);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .badge-live {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--live-color);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+  }
+
+  .badge-upload {
+    background: rgba(14, 165, 233, 0.15);
+    color: var(--upload-color);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+  }
+
+  .badge-admin {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .badge-user {
+    background: rgba(6, 182, 212, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+  }
+
+  /* Modal overlay */
+  .modal-backdrop {
+    @apply fixed inset-0 flex items-center justify-center p-4 z-50;
+    background: var(--modal-backdrop);
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+/* Pulse animation for live indicators */
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.6;
+  }
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulseGlow 1.8s infinite;
+}
+
+.pulse-red { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+.pulse-green { background: #10b981; box-shadow: 0 0 10px #10b981; }
+.pulse-cyan { background: #06b6d4; box-shadow: 0 0 10px #06b6d4; }
