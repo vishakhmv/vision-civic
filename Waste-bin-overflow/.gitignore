@@ -1,0 +1,38 @@
+# --- Model Weights & Large Files ---
+saved_clip_model/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# --- Downloaded Samples & Generated Output Media ---
+sample_test.jpg
+live_snapshot.jpg
+detected_*
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# --- Python Caching & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+
+# --- Jupyter & Colab Artifacts ---
+.ipynb_checkpoints/
+
+# --- Operating System & IDE Files ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
