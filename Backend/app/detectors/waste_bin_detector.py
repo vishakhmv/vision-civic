@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class WasteBinDetector(BaseDetector):
     """
     CLIP-based waste-bin overflow detection model.
-    Utilizes local saved_clip_model if present, with graceful fallback.
-    Loaded once and reused across requests.
+    Strictly utilizes the fine-tuned saved_clip_model neural network.
+    Loaded once and reused across inference frames.
     """
 
     def __init__(self, model_path: Optional[str] = None):
@@ -39,7 +39,6 @@ class WasteBinDetector(BaseDetector):
             import torch
             from transformers import CLIPProcessor, CLIPModel
 
-            # Look for local saved_clip_model folder first
             potential_paths = [
                 model_path,
                 os.path.join(os.getcwd(), "Waste-bin-overflow", "saved_clip_model"),
@@ -53,35 +52,35 @@ class WasteBinDetector(BaseDetector):
                     target_path = p
                     break
 
-            logger.info("Loading WasteBin CLIP model from %s onto %s...", target_path, self.device)
+            logger.info("Loading WasteBin CLIP neural model from %s onto %s...", target_path, self.device)
             self.model = CLIPModel.from_pretrained(target_path).to(self.device)
             self.processor = CLIPProcessor.from_pretrained(target_path)
             self.model.eval()
-            logger.info("[OK] WasteBin CLIP model loaded successfully.")
+            logger.info("[OK] WasteBin CLIP neural model loaded successfully.")
         except Exception as e:
-            logger.error("Failed to load CLIP model: %s. Using heuristic fallback.", e)
+            logger.error("[CRITICAL] Failed to initialize CLIP model: %s", e)
             self.model = None
+            self.processor = None
 
     def detect(self, frame: np.ndarray) -> Dict[str, Any]:
-        """Detect waste bin overflow in an OpenCV BGR frame."""
+        """Detect waste bin overflow in an OpenCV BGR frame using the CLIP neural network."""
         h, w = frame.shape[:2]
         default_bbox = [int(w * 0.1), int(h * 0.1), int(w * 0.9), int(h * 0.9)]
 
-        if self.model is None or self.processor is None:
-            # Fallback detector if weights fail to initialize
+        if self.model is None or self.processor is None or frame is None or frame.size == 0:
             return {
                 "detected": False,
                 "type": None,
                 "confidence": 0.0,
                 "bbox": None,
-                "label": "Model not initialized",
+                "label": "Model not loaded",
                 "details": {}
             }
 
         try:
             import torch
 
-            # Convert BGR OpenCV image to PIL RGB
+            # Convert BGR OpenCV frame to PIL RGB
             rgb_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             inputs = self.processor(
                 text=self.labels,
@@ -109,12 +108,12 @@ class WasteBinDetector(BaseDetector):
                 }
             }
         except Exception as e:
-            logger.error("Error during waste-bin inference: %s", e)
+            logger.error("Error during waste-bin CLIP inference: %s", e)
             return {
                 "detected": False,
                 "type": None,
                 "confidence": 0.0,
                 "bbox": None,
-                "label": f"Error: {str(e)}",
+                "label": "Error",
                 "details": {"error": str(e)}
             }

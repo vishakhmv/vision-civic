@@ -39,7 +39,7 @@ uploads/
 saved_clip_model/
 **/saved_clip_model/
 *.safetensors
-*.pt
+
 *.pth
 *.bin
 *.onnx
