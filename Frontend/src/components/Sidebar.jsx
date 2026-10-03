@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  LayoutDashboard,
+  Home,
   Video,
   UploadCloud,
   History,
@@ -10,6 +10,7 @@ import {
   Users,
   UserCheck,
   LogOut,
+  LogIn,
   X,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,7 +21,7 @@ import ThemeToggle from './ThemeToggle';
 import { SimpleTooltip } from './ui/tooltip';
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -49,7 +50,7 @@ export default function Sidebar({ isOpen, onClose }) {
   };
 
   const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/', label: 'Home', icon: Home },
     { to: '/live-monitoring', label: 'Live Monitoring', icon: Video, badge: 'LIVE' },
     { to: '/upload-video', label: 'Upload Video', icon: UploadCloud },
     { to: '/past-events', label: 'Past Events', icon: History },
@@ -113,6 +114,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.to === '/'}
                 onClick={onClose}
                 className={({ isActive }) =>
                   `flex items-center rounded-xl text-sm font-medium transition-all duration-200 relative group ${
@@ -174,8 +176,30 @@ export default function Sidebar({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* User Profile Info & Sign Out */}
-          {isCollapsed ? (
+          {/* User Profile Info & Sign Out OR Login Button for Guests */}
+          {!isAuthenticated ? (
+            isCollapsed ? (
+              <SimpleTooltip content="Sign In" side="right">
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-[var(--primary)] hover:bg-[var(--primary)]/20 bg-[var(--primary)]/10 border border-[var(--primary)]/30 transition-all cursor-pointer mx-auto"
+                  aria-label="Sign In"
+                >
+                  <LogIn size={15} />
+                </button>
+              </SimpleTooltip>
+            ) : (
+              <div className="pt-1 flex flex-col gap-2">
+                <button
+                  onClick={() => navigate('/login')}
+                  className="btn-primary w-full text-xs py-2 px-3 justify-center"
+                >
+                  <LogIn size={14} />
+                  <span>Sign In</span>
+                </button>
+              </div>
+            )
+          ) : isCollapsed ? (
             <div className="flex flex-col items-center gap-2 pt-1">
               <SimpleTooltip
                 content={`${user?.name || 'Operator'} (${isAdmin ? 'Admin' : 'Operator'})`}

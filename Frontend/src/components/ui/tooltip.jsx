@@ -10,11 +10,11 @@ export const TooltipContent = React.forwardRef(
     <TooltipPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
-      className={`z-50 overflow-hidden rounded-md bg-[var(--navy-900)] dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-xl border border-[var(--border-subtle)] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ${className}`}
+      className={`z-50 overflow-hidden rounded-lg bg-slate-900 text-slate-100 border border-slate-700/80 px-3 py-1.5 text-xs font-medium shadow-xl animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ${className}`}
       {...props}
     >
       {children}
-      <TooltipPrimitive.Arrow className="fill-[var(--navy-900)] dark:fill-slate-900" />
+      <TooltipPrimitive.Arrow className="fill-slate-900" />
     </TooltipPrimitive.Content>
   )
 );
@@ -23,7 +23,7 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 /**
  * Convenient wrapper for wrapping any icon/button with a stylish tooltip.
  */
-export function SimpleTooltip({ content, side = 'top', children, delayDuration = 200 }) {
+export function SimpleTooltip({ content, side = 'top', children, delayDuration = 150 }) {
   if (!content) return children;
   return (
     <Tooltip delayDuration={delayDuration}>

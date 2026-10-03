@@ -17,6 +17,7 @@ export function ThemeProvider({ children }) {
       }
       setCurrentTheme(resolved);
       document.documentElement.setAttribute('data-theme', resolved);
+      document.documentElement.classList.toggle('dark', resolved === 'dark');
       localStorage.setItem('vc_theme', themePreference);
     };
 

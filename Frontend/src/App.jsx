@@ -7,7 +7,7 @@ import MainLayout from './layouts/MainLayout';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
+import Landing from './pages/Landing';
 import LiveMonitoring from './pages/LiveMonitoring';
 import UploadVideo from './pages/UploadVideo';
 import PastEvents from './pages/PastEvents';
@@ -25,45 +25,77 @@ export default function App() {
         <AuthProvider>
           <BrowserRouter>
             <Toaster />
-          <Routes>
-            {/* Public Auth Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+            <Routes>
+              {/* Public Auth Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
 
-            {/* Protected Application Routes */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="live-monitoring" element={<LiveMonitoring />} />
-              <Route path="upload-video" element={<UploadVideo />} />
-              <Route path="past-events" element={<PastEvents />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="profile" element={<Profile />} />
+              {/* Main App Layout (Public Home & Protected Inner Features) */}
+              <Route path="/" element={<MainLayout />}>
+                {/* Publicly Accessible Landing Page at http://localhost:5173/ */}
+                <Route index element={<Landing />} />
+                <Route path="landing" element={<Landing />} />
+                <Route path="dashboard" element={<Navigate to="/" replace />} />
 
-              {/* Admin Exclusive Route */}
-              <Route
-                path="user-management"
-                element={
-                  <ProtectedRoute adminOnly={true}>
-                    <UserManagement />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
+                {/* Protected Application Routes (Require Authentication) */}
+                <Route
+                  path="live-monitoring"
+                  element={
+                    <ProtectedRoute>
+                      <LiveMonitoring />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="upload-video"
+                  element={
+                    <ProtectedRoute>
+                      <UploadVideo />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="past-events"
+                  element={
+                    <ProtectedRoute>
+                      <PastEvents />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="analytics"
+                  element={
+                    <ProtectedRoute>
+                      <Analytics />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="profile"
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  }
+                />
 
-            {/* Catch-all fallback */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </ThemeProvider>
+                {/* Admin Exclusive Route */}
+                <Route
+                  path="user-management"
+                  element={
+                    <ProtectedRoute adminOnly={true}>
+                      <UserManagement />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* Catch-all fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   );
 }
