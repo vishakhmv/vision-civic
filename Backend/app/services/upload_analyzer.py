@@ -71,9 +71,13 @@ async def analyze_uploaded_image(
             confidence=conf
         )
 
-        # Save annotated snapshot and upload to Cloudinary
-        snap_path = save_snapshot(annotated_frame, prefix=f"upload_img_{itype.lower()}")
-        snap_res = upload_image(snap_path, folder="vision_civic/snapshots")
+        # Save annotated snapshot and upload to Cloudinary (graceful fallback)
+        snap_res = {}
+        try:
+            snap_path = save_snapshot(annotated_frame, prefix=f"upload_img_{itype.lower()}")
+            snap_res = upload_image(snap_path, folder="vision_civic/snapshots")
+        except Exception as e:
+            logger.error("Cloudinary snapshot upload failed for %s: %s", itype, e)
 
         ext = os.path.splitext(original_filename)[1].lower().lstrip(".")
         incident_doc = {
@@ -249,17 +253,31 @@ async def analyze_uploaded_video(
             clip_end_offset = min(video_duration, clip_start_offset + 5.0)
 
         # 1. Save and upload snapshot image (annotated with bounding box & label tag)
-        snap_path = save_snapshot(best_frame, prefix=f"upload_snap_{itype.lower()}")
-        snap_res = upload_image(snap_path, folder="vision_civic/snapshots")
+        snap_res = {}
+        try:
+            snap_path = save_snapshot(best_frame, prefix=f"upload_snap_{itype.lower()}")
+            snap_res = upload_image(snap_path, folder="vision_civic/snapshots")
+        except Exception as e:
+            logger.error("Snapshot upload failed for %s: %s", itype, e)
 
-        # 2. Extract and upload exact incident video segment clip
-        clip_path = extract_video_clip(
-            source_video_path=video_path,
-            start_seconds=clip_start_offset,
-            end_seconds=clip_end_offset,
-            prefix=f"upload_clip_{itype.lower()}"
-        )
-        video_res = upload_video(clip_path, folder="vision_civic/incident_clips")
+        # 2. Extract and upload exact incident video segment clip (with bounding box marked)
+        video_res = {}
+        try:
+            clip_path = extract_video_clip(
+                source_video_path=video_path,
+                start_seconds=clip_start_offset,
+                end_seconds=clip_end_offset,
+                prefix=f"upload_clip_{itype.lower()}",
+                bbox=best_bbox,
+                label=itype,
+                confidence=best_conf,
+                event_start_seconds=event_start_offset,
+                event_end_seconds=event_end_offset,
+                detections=grp
+            )
+            video_res = upload_video(clip_path, folder="vision_civic/incident_clips")
+        except Exception as e:
+            logger.error("Video extract/upload failed for %s: %s", itype, e)
 
         # 3. Save MongoDB Incident Document
         ext = os.path.splitext(original_filename)[1].lower().lstrip(".")

@@ -13,6 +13,7 @@ import {
   Layers,
   Volume2,
   VolumeX,
+  Database,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import IncidentModal from '../components/IncidentModal';
@@ -26,6 +27,7 @@ export default function LiveMonitoring() {
   const [detectionActive, setDetectionActive] = useState(false);
   const [modelChoice, setModelChoice] = useState('both');
   const [cameraName, setCameraName] = useState('Civic Camera Station 1');
+  const [saveIncidentsToDb, setSaveIncidentsToDb] = useState(true);
 
   // Real-time detection states
   const [currentDetections, setCurrentDetections] = useState([]);
@@ -41,6 +43,11 @@ export default function LiveMonitoring() {
   const overlayRef = useRef(null);
   const wsRef = useRef(null);
   const sendIntervalRef = useRef(null);
+  const saveIncidentsToDbRef = useRef(saveIncidentsToDb);
+
+  useEffect(() => {
+    saveIncidentsToDbRef.current = saveIncidentsToDb;
+  }, [saveIncidentsToDb]);
 
   // Initialize and maintain WebSocket connection
   useEffect(() => {
@@ -65,7 +72,8 @@ export default function LiveMonitoring() {
         ws.send(JSON.stringify({
           action: 'configure',
           model_choice: modelChoice,
-          camera_name: cameraName
+          camera_name: cameraName,
+          save_to_db: saveIncidentsToDb
         }));
       };
 
@@ -116,10 +124,11 @@ export default function LiveMonitoring() {
       wsRef.current.send(JSON.stringify({
         action: 'configure',
         model_choice: modelChoice,
-        camera_name: cameraName
+        camera_name: cameraName,
+        save_to_db: saveIncidentsToDb
       }));
     }
-  }, [modelChoice, cameraName]);
+  }, [modelChoice, cameraName, saveIncidentsToDb]);
 
   const playAlertSound = () => {
     try {
@@ -192,6 +201,13 @@ export default function LiveMonitoring() {
       clearInterval(sendIntervalRef.current);
       sendIntervalRef.current = null;
     }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({ action: 'flush' }));
+      } catch (err) {
+        console.error('Error sending flush action:', err);
+      }
+    }
     setCurrentDetections([]);
     clearOverlay();
   };
@@ -213,7 +229,8 @@ export default function LiveMonitoring() {
 
     wsRef.current.send(JSON.stringify({
       action: 'frame',
-      data: dataUrl
+      data: dataUrl,
+      save_to_db: saveIncidentsToDbRef.current
     }));
   };
 
@@ -273,16 +290,6 @@ export default function LiveMonitoring() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div
-            className={`flex items-center gap-2 py-1.5 px-3.5 rounded-lg text-xs font-semibold border ${
-              webcamActive
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]'
-            }`}
-          >
-            <span className={`pulse-dot ${webcamActive ? 'pulse-green' : 'bg-[var(--text-dim)]'}`} />
-            <span>{webcamActive ? 'Camera Connected' : 'Camera Offline'}</span>
-          </div>
 
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
@@ -290,6 +297,36 @@ export default function LiveMonitoring() {
           >
             {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             <span>{soundEnabled ? 'Alert Audio On' : 'Muted'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const nextVal = !saveIncidentsToDb;
+              setSaveIncidentsToDb(nextVal);
+              saveIncidentsToDbRef.current = nextVal;
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                  action: 'configure',
+                  model_choice: modelChoice,
+                  camera_name: cameraName,
+                  save_to_db: nextVal
+                }));
+              }
+              toast.info(
+                nextVal
+                  ? 'Incident Recording to DB: ON (hazard clips will be saved)'
+                  : 'Incident Recording to DB: OFF (boxes marked on live video only)'
+              );
+            }}
+            className={`btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 transition-all ${
+              saveIncidentsToDb
+                ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 font-semibold shadow-sm'
+                : 'border-amber-500/50 bg-amber-500/10 text-amber-300 font-semibold'
+            }`}
+            title={saveIncidentsToDb ? 'Auto-saves detected hazard clips into MongoDB database' : 'Preview only: marks bounding box on live video without saving to DB'}
+          >
+            <Database size={15} />
+            <span>{saveIncidentsToDb ? 'Save Incidents: ON' : 'Save Incidents: OFF'}</span>
           </button>
         </div>
       </div>
@@ -325,11 +362,8 @@ export default function LiveMonitoring() {
           <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-[var(--border-subtle)] flex items-center justify-center">
             {/* Live indicator tag */}
             {webcamActive && (
-              <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-2 bg-black/70 py-1.5 px-3 rounded-full text-xs font-bold border border-white/10">
-                <span className={`pulse-dot ${detectionActive ? 'pulse-red' : 'pulse-cyan'}`} />
-                <span className={detectionActive ? 'text-red-400' : 'text-cyan-400'}>
-                  {detectionActive ? 'DETECTION ACTIVE' : 'CAMERA CONNECTED'}
-                </span>
+              <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-2 bg-black/75 backdrop-blur-md py-1.5 px-3.5 rounded-full text-xs font-bold border border-white/10 shadow-lg">
+                <span className={`pulse-dot ${detectionActive ? (saveIncidentsToDb ? 'pulse-red' : 'pulse-green') : 'pulse-cyan'}`} />
               </div>
             )}
 

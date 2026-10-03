@@ -29,6 +29,7 @@ class IncidentSession:
         self.bbox = bbox
         self.is_finalizing = False
         self.post_event_deadline: Optional[float] = None
+        self.saved = False
 
 
 class LiveIncidentManager:
@@ -42,12 +43,14 @@ class LiveIncidentManager:
         camera_name: str = "Webcam 1",
         source_id: str = "cam_default",
         user_id: str = "system",
-        on_incident_saved: Optional[Callable[[Dict[str, Any]], Any]] = None
+        on_incident_saved: Optional[Callable[[Dict[str, Any]], Any]] = None,
+        save_to_db: bool = True
     ):
         self.camera_name = camera_name
         self.source_id = source_id
         self.user_id = user_id
         self.on_incident_saved = on_incident_saved
+        self.save_to_db = save_to_db
 
         self.rolling_buffer = RollingBuffer(
             max_seconds=settings.PRE_EVENT_SECONDS + 2.0,
@@ -64,6 +67,10 @@ class LiveIncidentManager:
         """
         Feed frame and its detector results into the incident lifecycle manager.
         """
+        if not self.save_to_db:
+            # Preview mode only: detection and bounding boxes are active, but DB saving is disabled
+            return
+
         now = time.time()
         now_dt = datetime.now(timezone.utc)
         self.rolling_buffer.append(frame, now)
@@ -71,7 +78,8 @@ class LiveIncidentManager:
         detected_types_now = set()
 
         for det in detections:
-            if not det.get("detected"):
+            # Skip if explicitly flagged as not detected or missing type
+            if det.get("detected") is False or "type" not in det:
                 continue
 
             inc_type = det["type"]
@@ -107,7 +115,8 @@ class LiveIncidentManager:
                     session.max_confidence = confidence
                     session.snapshot_frame = annotated_snap
                     session.bbox = bbox
-                session.frames.append(frame.copy())
+                # Record frame with bounding box into incident video clip
+                session.frames.append(annotated_snap.copy())
             else:
                 # Check cooldown
                 last_cool = self.cooldowns.get(inc_type, 0.0)
@@ -132,48 +141,131 @@ class LiveIncidentManager:
                     pre_frames=pre_frames,
                     bbox=bbox
                 )
+                # Record frame with bounding box into incident video clip
+                session.frames.append(annotated_snap.copy())
                 self.active_incidents[inc_type] = session
 
-
-        # Check existing incidents that were NOT detected in this frame
-        # (Incident continuation vs completion)
+        # Check existing incidents that were NOT detected in this frame or reached max duration
         types_to_remove = []
         for inc_type, session in list(self.active_incidents.items()):
-            if inc_type not in detected_types_now:
-                # Add frame during grace / post-event period
-                session.frames.append(frame.copy())
+            # 1. Cap long ongoing incidents (e.g. continuous fire/overflow for 12 seconds)
+            # This ensures evidence is saved to DB promptly even if camera stays aimed at it!
+            if (now - session.start_time) >= 12.0:
+                logger.info("Incident %s reached max duration (12s). Finalizing and saving to DB...", inc_type)
+                types_to_remove.append(inc_type)
+                asyncio.create_task(self._finalize_and_save_incident(session))
+                continue
 
-                # If no detection for 2.0s, enter post-event finalization
+            # 2. Check if detection ceased in current frame
+            if inc_type not in detected_types_now:
+                # If during detection transition, draw bounding box on frame
+                if session.bbox and not session.is_finalizing:
+                    annotated_gap = draw_bounding_box(
+                        frame=frame,
+                        bbox=session.bbox,
+                        label=inc_type,
+                        confidence=session.max_confidence
+                    )
+                    session.frames.append(annotated_gap)
+                else:
+                    session.frames.append(frame.copy())
+
+                # If no detection for 1.2s, enter post-event finalization
                 if not session.is_finalizing:
-                    if (now - session.last_detection_time) > 2.0:
+                    if (now - session.last_detection_time) > 1.2:
                         session.is_finalizing = True
-                        session.post_event_deadline = now + settings.POST_EVENT_SECONDS
-                        logger.info("Incident %s detection ended. Capturing %ds post-event context...",
-                                    inc_type, settings.POST_EVENT_SECONDS)
+                        session.post_event_deadline = now + min(float(settings.POST_EVENT_SECONDS), 2.0)
+                        logger.info("Incident %s detection ended. Capturing post-event context...", inc_type)
 
                 # Check if post-event period has concluded
                 if session.is_finalizing and session.post_event_deadline:
                     if now >= session.post_event_deadline:
                         types_to_remove.append(inc_type)
-                        # Schedule asynchronous save to avoid blocking real-time feed
                         asyncio.create_task(self._finalize_and_save_incident(session))
 
         for it in types_to_remove:
             del self.active_incidents[it]
 
+    async def check_inactivity(self, now: Optional[float] = None):
+        """
+        Check for incidents that should be finalized when no new frames have arrived
+        (e.g., webcam paused, or interval between frames).
+        """
+        if not self.save_to_db:
+            self.active_incidents.clear()
+            return
+
+        if now is None:
+            now = time.time()
+        types_to_finalize = []
+        for inc_type, session in list(self.active_incidents.items()):
+            if session.saved:
+                types_to_finalize.append(inc_type)
+                continue
+            if (now - session.last_detection_time) >= 1.5:
+                types_to_finalize.append(inc_type)
+
+        for inc_type in types_to_finalize:
+            session = self.active_incidents.pop(inc_type, None)
+            if session and not session.saved:
+                await self._finalize_and_save_incident(session)
+
+    async def flush(self):
+        """Immediately finalize and save all ongoing active incidents."""
+        if not self.save_to_db:
+            self.active_incidents.clear()
+            return
+
+        sessions = list(self.active_incidents.values())
+        self.active_incidents.clear()
+        for session in sessions:
+            if not session.saved:
+                try:
+                    await self._finalize_and_save_incident(session)
+                except Exception as e:
+                    logger.error("Failed to flush incident: %s", e)
+
+    def set_save_to_db(self, enabled: bool):
+        """Toggle saving incidents to database. Clears active incidents when disabled."""
+        self.save_to_db = bool(enabled)
+        if not self.save_to_db:
+            self.active_incidents.clear()
+            logger.info("Incident recording to DB is OFF (Preview Only). Cleared all active incident queues.")
+        else:
+            logger.info("Incident recording to DB is ON.")
+
     async def _finalize_and_save_incident(self, session: IncidentSession):
         """Builds clip, snapshot, uploads to Cloudinary/local storage, and saves to MongoDB."""
+        if not self.save_to_db:
+            logger.info("Skipping incident finalization: save_to_db is OFF")
+            return
+        if session.saved:
+            return
+        session.saved = True
+
         try:
             logger.info("Finalizing incident: %s...", session.incident_type)
             duration = max(1.0, session.end_time - session.start_time)
 
-            # 1. Save snapshot image
-            snap_path = save_snapshot(session.snapshot_frame, prefix=f"snap_{session.incident_type.lower()}")
-            snap_res = upload_image(snap_path, folder="vision_civic/snapshots")
+            if not session.frames and session.snapshot_frame is not None:
+                session.frames = [session.snapshot_frame]
 
-            # 2. Build and save incident video clip
-            clip_path = frames_to_video(session.frames, fps=15, prefix=f"clip_{session.incident_type.lower()}")
-            video_res = upload_video(clip_path, folder="vision_civic/incident_clips")
+            # 1. Save snapshot image & upload to Cloudinary (graceful fallback)
+            snap_res = {}
+            try:
+                snap_path = save_snapshot(session.snapshot_frame, prefix=f"snap_{session.incident_type.lower()}")
+                snap_res = upload_image(snap_path, folder="vision_civic/snapshots")
+            except Exception as e:
+                logger.error("Snapshot upload failed for %s: %s", session.incident_type, e)
+
+            # 2. Build and save incident video clip & upload to Cloudinary (graceful fallback)
+            video_res = {}
+            try:
+                if session.frames:
+                    clip_path = frames_to_video(session.frames, fps=15, prefix=f"clip_{session.incident_type.lower()}")
+                    video_res = upload_video(clip_path, folder="vision_civic/incident_clips")
+            except Exception as e:
+                logger.error("Video creation/upload failed for %s: %s", session.incident_type, e)
 
             # 3. Construct Live Camera Incident Document
             incident_doc = {
@@ -182,7 +274,6 @@ class LiveIncidentManager:
                 "confidence": round(session.max_confidence, 4),
                 "bbox": session.bbox,
                 "source_type": "LIVE_CAMERA",
-
                 "source_id": self.source_id,
                 "camera_name": self.camera_name,
                 "incident_detected_at": session.start_dt,

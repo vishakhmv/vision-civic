@@ -132,11 +132,18 @@ def extract_video_clip(
     source_video_path: str,
     start_seconds: float,
     end_seconds: float,
-    prefix: str = "upload_incident"
+    prefix: str = "upload_incident",
+    bbox: Optional[List[int]] = None,
+    label: Optional[str] = None,
+    confidence: Optional[float] = None,
+    event_start_seconds: Optional[float] = None,
+    event_end_seconds: Optional[float] = None,
+    detections: Optional[List[Dict[str, Any]]] = None
 ) -> str:
     """
-    Extract a clip from an uploaded video file between start_seconds and end_seconds.
-    Uses ffmpeg for speed and precision, with OpenCV fallback.
+    Extract an incident clip from an uploaded video between start_seconds and end_seconds,
+    drawing bounding boxes and label badges directly on the video frames during the detected incident.
+    Encodes to universal browser-compatible H.264 MP4.
     """
     if not os.path.exists(source_video_path):
         raise FileNotFoundError(f"Source video not found: {source_video_path}")
@@ -144,29 +151,14 @@ def extract_video_clip(
     start_sec = max(0.0, start_seconds)
     duration = max(1.0, end_seconds - start_sec)
     unique_id = uuid.uuid4().hex[:10]
-    output_path = os.path.join(TEMP_DIR, f"{prefix}_{unique_id}.mp4")
+    raw_path = os.path.join(TEMP_DIR, f"{prefix}_{unique_id}_raw.mp4")
+    final_path = os.path.join(TEMP_DIR, f"{prefix}_{unique_id}.mp4")
 
-    # Try ffmpeg extraction
-    try:
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", str(start_sec),
-            "-i", source_video_path,
-            "-t", str(duration),
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
-            output_path
-        ]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
-        if res.returncode == 0 and os.path.exists(output_path):
-            return output_path
-    except Exception as e:
-        logger.warning("ffmpeg clip extraction failed (%s). Falling back to OpenCV.", e)
-
-    # OpenCV fallback extraction
+    # Read frames and draw bounding boxes on incident frames
     cap = cv2.VideoCapture(source_video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    if fps <= 0 or np.isnan(fps):
+        fps = 25.0
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -175,19 +167,62 @@ def extract_video_clip(
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+    out = cv2.VideoWriter(raw_path, fourcc, fps, (w, h))
+
+    ev_start = event_start_seconds if event_start_seconds is not None else start_sec
+    ev_end = event_end_seconds if event_end_seconds is not None else end_seconds
 
     current_frame = start_frame
     while cap.isOpened() and current_frame <= end_frame:
         ret, frame = cap.read()
         if not ret:
             break
-        out.write(frame)
+
+        current_time_sec = current_frame / fps
+
+        # If this frame is within the incident occurrence, draw bounding box
+        if (ev_start - 0.5) <= current_time_sec <= (ev_end + 0.5):
+            cur_bbox = bbox
+            cur_conf = confidence or 0.8
+            cur_label = label or "INCIDENT"
+
+            if detections:
+                closest = min(detections, key=lambda d: abs(d.get("offset", 0.0) - current_time_sec))
+                cur_bbox = closest.get("bbox") or cur_bbox
+                cur_conf = closest.get("confidence") or cur_conf
+                cur_label = closest.get("type") or cur_label
+
+            annotated_frame = draw_bounding_box(
+                frame=frame,
+                bbox=cur_bbox,
+                label=cur_label,
+                confidence=cur_conf
+            )
+            out.write(annotated_frame)
+        else:
+            out.write(frame)
+
         current_frame += 1
 
     cap.release()
     out.release()
-    return output_path
+
+    # Transcode with ffmpeg for universal browser H.264 playback
+    try:
+        cmd = [
+            "ffmpeg", "-y", "-i", raw_path,
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart", final_path
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        if result.returncode == 0 and os.path.exists(final_path):
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
+            return final_path
+    except Exception as e:
+        logger.warning("ffmpeg transcoding failed (%s). Using raw MP4 file.", e)
+
+    return raw_path
 
 
 def get_video_metadata(file_path: str) -> Dict[str, Any]:

@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import logging
@@ -108,23 +109,40 @@ async def websocket_monitoring(
 
     try:
         while True:
-            raw_text = await websocket.receive_text()
-            data = json.loads(raw_text)
+            try:
+                raw_text = await asyncio.wait_for(websocket.receive_text(), timeout=1.5)
+            except asyncio.TimeoutError:
+                # No frame received in 1.5s - check if active incident should be saved
+                await incident_mgr.check_inactivity()
+                continue
 
+            data = json.loads(raw_text)
             msg_type = data.get("action")
 
             if msg_type == "configure":
                 model_choice = data.get("model_choice", "both")
                 camera_name = data.get("camera_name", "Webcam 1")
+                save_to_db = data.get("save_to_db", True)
                 incident_mgr.camera_name = camera_name
+                incident_mgr.save_to_db = save_to_db
+                logger.info("Configured session: model=%s, cam=%s, save_to_db=%s", model_choice, camera_name, save_to_db)
                 await websocket.send_json({
                     "type": "CONFIG_ACK",
                     "model_choice": model_choice,
-                    "camera_name": camera_name
+                    "camera_name": camera_name,
+                    "save_to_db": save_to_db
                 })
                 continue
 
+            elif msg_type in ["stop", "flush", "pause"]:
+                await incident_mgr.flush()
+                await websocket.send_json({"type": "FLUSH_ACK"})
+                continue
+
             elif msg_type == "frame":
+                if "save_to_db" in data:
+                    incident_mgr.set_save_to_db(bool(data["save_to_db"]))
+
                 frame_data = data.get("data")
                 if not frame_data:
                     continue
@@ -155,6 +173,7 @@ async def websocket_monitoring(
                     for res in results:
                         if res.get("detected"):
                             detections.append({
+                                "detected": True,
                                 "type": res["type"],
                                 "confidence": res["confidence"],
                                 "bbox": res.get("bbox"),
@@ -170,6 +189,7 @@ async def websocket_monitoring(
                     "type": "DETECTION_UPDATE",
                     "detections": detections,
                     "active_incidents": list(incident_mgr.active_incidents.keys()),
+                    "save_to_db": incident_mgr.save_to_db,
                     "timestamp": now_str
                 })
 
@@ -184,3 +204,8 @@ async def websocket_monitoring(
             await websocket.close()
         except Exception:
             pass
+    finally:
+        try:
+            await incident_mgr.flush()
+        except Exception as e:
+            logger.error("Error flushing incident manager on exit: %s", e)
