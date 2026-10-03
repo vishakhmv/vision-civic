@@ -214,7 +214,7 @@ export default function PastEvents() {
       {loading ? (
         <div className="text-center py-16 text-[var(--text-dim)]">
           <div className="pulse-dot pulse-cyan w-3.5 h-3.5 mb-3 mx-auto" />
-          <p className="text-sm">Querying MongoDB archive...</p>
+          <p className="text-sm">Loading Past Events...</p>
         </div>
       ) : incidents.length === 0 ? (
         <div className="glass-panel text-center py-16 px-6 text-[var(--text-dim)]">
