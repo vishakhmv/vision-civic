@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   UploadCloud,
   FileVideo,
+  Image as ImageIcon,
   Layers,
   Play,
   CheckCircle2,
@@ -10,11 +11,11 @@ import {
   CloudFog,
   Trash2,
   ArrowRight,
-  Film
+  Film,
+  Eye
 } from 'lucide-react';
 import { uploadsApi } from '../services/api';
 import IncidentModal from '../components/IncidentModal';
-
 import { toast } from '../components/ui/sonner';
 import { SimpleTooltip } from '../components/ui/tooltip';
 
@@ -31,13 +32,14 @@ export default function UploadVideo() {
   const [detectedIncidents, setDetectedIncidents] = useState([]);
   const [selectedIncident, setSelectedIncident] = useState(null);
 
+  const validExts = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.jpg', '.jpeg', '.png', '.webp', '.bmp'];
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
-      const validExts = ['.mp4', '.avi', '.mov', '.mkv', '.webm'];
       const fileExt = '.' + selected.name.split('.').pop().toLowerCase();
       if (!validExts.includes(fileExt)) {
-        toast.warning(`Unsupported format '${fileExt}'. Please select an MP4, AVI, MOV, or MKV file.`);
+        toast.warning(`Unsupported format '${fileExt}'. Supported formats: MP4, AVI, MOV, MKV, JPG, PNG, WEBP.`);
         return;
       }
       setFile(selected);
@@ -57,17 +59,17 @@ export default function UploadVideo() {
 
   const handleUploadAndAnalyze = async () => {
     if (!file) {
-      toast.warning('Please select a video file to upload.');
-      setErrorMsg('Please select a video file to upload.');
+      toast.warning('Please select a video or image file to upload.');
+      setErrorMsg('Please select a video or image file to upload.');
       return;
     }
 
-    const toastId = toast.loading('Uploading video footage...');
+    const toastId = toast.loading('Uploading media footage...');
 
     try {
       setErrorMsg(null);
       setIsUploading(true);
-      setStatusMessage('Uploading video footage...');
+      setStatusMessage('Uploading media footage...');
 
       const formData = new FormData();
       formData.append('file', file);
@@ -83,8 +85,9 @@ export default function UploadVideo() {
       setUploadProgress(100);
 
       setIsAnalyzing(true);
-      setStatusMessage('Processing Video: Scanning video frames for civic hazards...');
-      toast.loading('Analyzing video frames with AI detectors...', { id: toastId });
+      const isImg = meta.is_image;
+      setStatusMessage(isImg ? 'Scanning Image: Running AI hazard detectors...' : 'Processing Video: Scanning video frames for civic hazards...');
+      toast.loading(isImg ? 'Analyzing image with AI detectors...' : 'Analyzing video frames with AI detectors...', { id: toastId });
 
       const analyzeRes = await uploadsApi.analyze({
         file_id: meta.file_id,
@@ -100,11 +103,11 @@ export default function UploadVideo() {
       if (count > 0) {
         toast.success(`Analysis complete: ${count} civic incident(s) detected and saved to Cloudinary.`, { id: toastId });
       } else {
-        toast.info('Analysis complete: No incidents detected in this footage.', { id: toastId });
+        toast.info('Analysis complete: No incidents detected in this media.', { id: toastId });
       }
     } catch (err) {
       console.error(err);
-      const msg = err.response?.data?.detail || 'Video processing failed. Please verify format.';
+      const msg = err.response?.data?.detail || 'Media processing failed. Please verify file format.';
       setErrorMsg(msg);
       toast.error(msg, { id: toastId });
       setIsUploading(false);
@@ -116,10 +119,10 @@ export default function UploadVideo() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)]">
-          Uploaded Video Analysis
+          Uploaded Media Analysis
         </h2>
         <p className="text-sm text-[var(--text-muted)] mt-1">
-          Upload recorded CCTV or mobile footage to extract incident context clips with precise in-file timestamp offsets.
+          Upload recorded CCTV footage or image files to extract incident context clips with precise timestamps and proof snapshots.
         </p>
       </div>
 
@@ -135,17 +138,17 @@ export default function UploadVideo() {
         {/* Upload Zone */}
         <div className="glass-panel p-6 lg:col-span-3">
           <h4 className="text-base font-bold mb-4 text-[var(--text-main)]">
-            1. Select Video Media
+            1. Select Video or Image Media
           </h4>
 
           <div
-            onClick={() => document.getElementById('videoFileInput').click()}
+            onClick={() => document.getElementById('mediaFileInput').click()}
             className="border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--primary)] rounded-xl p-8 sm:p-12 text-center bg-[var(--bg-surface)] hover:bg-[var(--bg-card-hover)] cursor-pointer transition-all"
           >
             <input
-              id="videoFileInput"
+              id="mediaFileInput"
               type="file"
-              accept="video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm"
+              accept="video/mp4,video/avi,video/quicktime,video/x-matroska,video/webm,image/jpeg,image/png,image/webp,image/bmp"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -162,10 +165,10 @@ export default function UploadVideo() {
             ) : (
               <div>
                 <p className="font-semibold text-sm sm:text-base text-[var(--text-main)] mb-1">
-                  Click or drag and drop video file here
+                  Click or drag and drop video or image file here
                 </p>
                 <p className="text-xs text-[var(--text-dim)]">
-                  Supports MP4, AVI, MOV, MKV (H.264 recommended)
+                  Supports MP4, AVI, MOV, MKV, JPG, PNG, WEBP
                 </p>
               </div>
             )}
@@ -232,7 +235,7 @@ export default function UploadVideo() {
             disabled={!file || isUploading || isAnalyzing}
             className="btn-primary w-full justify-center mt-6 py-3 rounded-lg font-semibold text-sm flex items-center gap-2"
           >
-            <span>{isUploading ? 'Uploading Video...' : isAnalyzing ? 'Processing Video...' : 'Upload & Start Analysis'}</span>
+            <span>{isUploading ? 'Uploading Media...' : isAnalyzing ? 'Processing Media...' : 'Upload & Start Analysis'}</span>
             <ArrowRight size={17} />
           </button>
         </div>
@@ -245,7 +248,7 @@ export default function UploadVideo() {
             <div>
               <h4 className="text-base sm:text-lg font-bold text-[var(--text-main)]">Analysis Findings</h4>
               <span className="text-xs text-[var(--text-dim)]">
-                Extracted incident clips and in-video offsets
+                Extracted incident details and proof media
               </span>
             </div>
             <span className="badge badge-upload">
@@ -258,7 +261,7 @@ export default function UploadVideo() {
               <CheckCircle2 size={40} className="mx-auto mb-3 text-emerald-500" />
               <h5 className="text-base font-semibold text-[var(--text-main)]">No Violations Found</h5>
               <p className="text-xs mt-1 max-w-sm mx-auto">
-                The video stream was scanned completely. No waste overflows, fire outbreaks, or smoke clouds were detected.
+                The media file was scanned completely. No waste overflows, fire outbreaks, or smoke clouds were detected.
               </p>
             </div>
           ) : (
@@ -266,6 +269,7 @@ export default function UploadVideo() {
               {detectedIncidents.map((inc) => {
                 const isFire = inc.incident_type === 'FIRE';
                 const isSmoke = inc.incident_type === 'SMOKE';
+                const isImage = inc.source_type === 'UPLOADED_IMAGE';
 
                 return (
                   <div
@@ -284,39 +288,55 @@ export default function UploadVideo() {
                       </span>
                     </div>
 
-                    <div className="w-full h-40 rounded-lg overflow-hidden bg-black mb-3 border border-[var(--border-subtle)] flex items-center justify-center">
+                    <div className="w-full h-40 rounded-lg overflow-hidden bg-black mb-3 border border-[var(--border-subtle)] flex items-center justify-center relative">
                       {inc.snapshot_url ? (
                         <img src={inc.snapshot_url} alt="Incident preview" className="w-full h-full object-cover" />
                       ) : (
                         <Film size={24} className="text-[var(--text-dim)]" />
                       )}
+                      <span className={`absolute top-2 right-2 badge ${isImage ? 'badge-upload' : 'badge-live'} text-[9px]`}>
+                        {isImage ? 'IMAGE FILE' : 'VIDEO CLIP'}
+                      </span>
                     </div>
 
-                    <div className="text-xs text-[var(--text-dim)] flex flex-col gap-1.5 mb-4">
-                      <div className="flex justify-between">
-                        <span>In-Video Position:</span>
-                        <strong className="text-amber-400">
-                          {formatOffset(inc.event_start_offset_seconds)} &rarr; {formatOffset(inc.event_end_offset_seconds)}
-                        </strong>
+                    {!isImage ? (
+                      <div className="text-xs text-[var(--text-dim)] flex flex-col gap-1.5 mb-4">
+                        <div className="flex justify-between">
+                          <span>In-Video Position:</span>
+                          <strong className="text-amber-400">
+                            {formatOffset(inc.event_start_offset_seconds)} &rarr; {formatOffset(inc.event_end_offset_seconds)}
+                          </strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Event Duration:</span>
+                          <strong className="text-[var(--text-main)]">{inc.event_duration_seconds}s</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Extracted Clip:</span>
+                          <strong className="text-[var(--text-main)]">
+                            {formatOffset(inc.clip_start_offset_seconds)} &rarr; {formatOffset(inc.clip_end_offset_seconds)}
+                          </strong>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Event Duration:</span>
-                        <strong className="text-[var(--text-main)]">{inc.event_duration_seconds}s</strong>
+                    ) : (
+                      <div className="text-xs text-[var(--text-dim)] flex flex-col gap-1.5 mb-4">
+                        <div className="flex justify-between">
+                          <span>Media Format:</span>
+                          <strong className="text-[var(--text-main)] uppercase">{inc.original_filename?.split('.').pop()} Image</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>File Size:</span>
+                          <strong className="text-[var(--text-main)]">{((inc.file_size_bytes || 0) / (1024 * 1024)).toFixed(2)} MB</strong>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Extracted Clip:</span>
-                        <strong className="text-[var(--text-main)]">
-                          {formatOffset(inc.clip_start_offset_seconds)} &rarr; {formatOffset(inc.clip_end_offset_seconds)}
-                        </strong>
-                      </div>
-                    </div>
+                    )}
 
                     <button
                       onClick={() => setSelectedIncident(inc)}
                       className="btn-outline w-full justify-center text-xs py-2"
                     >
-                      <Play size={14} />
-                      <span>Inspect Extracted Clip</span>
+                      {isImage ? <Eye size={14} /> : <Play size={14} />}
+                      <span>{isImage ? 'Inspect Image Proof' : 'Inspect Extracted Clip'}</span>
                     </button>
                   </div>
                 );

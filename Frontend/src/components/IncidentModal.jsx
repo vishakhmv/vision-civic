@@ -253,22 +253,6 @@ export default function IncidentModal({ incident, onClose, onDeleted }) {
               </div>
             </div>
           )}
-
-          {/* Cloud Storage IDs */}
-          <div className="bg-[var(--bg-surface)] rounded-lg p-3.5 border border-[var(--border-subtle)] text-xs text-[var(--text-dim)] flex flex-wrap gap-4 justify-between">
-            <div>
-              <span>Cloudinary Video Asset: </span>
-              <code className="text-[var(--text-main)] font-mono">{incident.video_public_id || 'None'}</code>
-            </div>
-            <div>
-              <span>Cloudinary Snapshot: </span>
-              <code className="text-[var(--text-main)] font-mono">{incident.snapshot_public_id || 'None'}</code>
-            </div>
-            <div>
-              <span>MongoDB Document: </span>
-              <code className="text-[var(--text-main)] font-mono">{incident._id}</code>
-            </div>
-          </div>
         </div>
 
         {/* Modal Footer */}
@@ -280,7 +264,7 @@ export default function IncidentModal({ incident, onClose, onDeleted }) {
               className="btn-danger text-xs sm:text-sm py-2 px-4"
             >
               <Trash size={15} />
-              <span>{isDeleting ? 'Deleting Asset...' : 'Delete Incident (Admin)'}</span>
+              <span>{isDeleting ? 'Deleting Asset...' : 'Delete Incident'}</span>
             </button>
           ) : (
             <div />

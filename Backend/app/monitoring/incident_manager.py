@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List, Callable
 import numpy as np
 from app.core.config import settings
 from app.monitoring.rolling_buffer import RollingBuffer
-from app.services.video_processor import save_snapshot, frames_to_video
+from app.services.video_processor import save_snapshot, frames_to_video, draw_bounding_box
 from app.services.cloudinary_service import upload_image, upload_video
 from app.database.mongodb import get_database
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class IncidentSession:
     """Represents an ongoing live incident tracking state."""
-    def __init__(self, incident_type: str, model_type: str, start_time: float, start_dt: datetime, confidence: float, snapshot_frame: np.ndarray, pre_frames: List[np.ndarray]):
+    def __init__(self, incident_type: str, model_type: str, start_time: float, start_dt: datetime, confidence: float, snapshot_frame: np.ndarray, pre_frames: List[np.ndarray], bbox: Optional[List[int]] = None):
         self.incident_type = incident_type
         self.model_type = model_type
         self.start_time = start_time
@@ -26,6 +26,7 @@ class IncidentSession:
         self.max_confidence = confidence
         self.snapshot_frame = snapshot_frame
         self.frames: List[np.ndarray] = list(pre_frames)
+        self.bbox = bbox
         self.is_finalizing = False
         self.post_event_deadline: Optional[float] = None
 
@@ -75,6 +76,7 @@ class LiveIncidentManager:
 
             inc_type = det["type"]
             confidence = det.get("confidence", 0.0)
+            bbox = det.get("bbox")
             model_type = "waste_bin" if inc_type == "WASTE_BIN_OVERFLOW" else "fire_smoke"
 
             # Check threshold
@@ -87,6 +89,14 @@ class LiveIncidentManager:
 
             detected_types_now.add(inc_type)
 
+            # Draw bounding box on snapshot frame
+            annotated_snap = draw_bounding_box(
+                frame=frame,
+                bbox=bbox,
+                label=inc_type,
+                confidence=confidence
+            )
+
             # Check if active
             if inc_type in self.active_incidents:
                 session = self.active_incidents[inc_type]
@@ -95,7 +105,8 @@ class LiveIncidentManager:
                 session.end_dt = now_dt
                 if confidence > session.max_confidence:
                     session.max_confidence = confidence
-                    session.snapshot_frame = frame.copy()
+                    session.snapshot_frame = annotated_snap
+                    session.bbox = bbox
                 session.frames.append(frame.copy())
             else:
                 # Check cooldown
@@ -117,10 +128,12 @@ class LiveIncidentManager:
                     start_time=now,
                     start_dt=now_dt,
                     confidence=confidence,
-                    snapshot_frame=frame.copy(),
-                    pre_frames=pre_frames
+                    snapshot_frame=annotated_snap,
+                    pre_frames=pre_frames,
+                    bbox=bbox
                 )
                 self.active_incidents[inc_type] = session
+
 
         # Check existing incidents that were NOT detected in this frame
         # (Incident continuation vs completion)
@@ -167,7 +180,9 @@ class LiveIncidentManager:
                 "incident_type": session.incident_type,
                 "model_type": session.model_type,
                 "confidence": round(session.max_confidence, 4),
+                "bbox": session.bbox,
                 "source_type": "LIVE_CAMERA",
+
                 "source_id": self.source_id,
                 "camera_name": self.camera_name,
                 "incident_detected_at": session.start_dt,

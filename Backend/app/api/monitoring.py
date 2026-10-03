@@ -143,28 +143,24 @@ async def websocket_monitoring(
                 detections = []
                 now_str = datetime.now(timezone.utc).isoformat()
 
-                # Run inference based on selected model
-                if model_choice in ["waste_bin", "both"]:
-                    w_res = waste_detector.detect(frame)
-                    if w_res.get("detected"):
-                        detections.append({
-                            "type": w_res["type"],
-                            "confidence": w_res["confidence"],
-                            "bbox": w_res.get("bbox"),
-                            "label": w_res.get("label"),
-                            "timestamp": now_str
-                        })
+                # Concurrent parallel inference across selected models
+                tasks = []
+                if model_choice in ["waste_bin", "both"] and waste_detector:
+                    tasks.append(asyncio.to_thread(waste_detector.detect, frame))
+                if model_choice in ["fire_smoke", "both"] and fire_detector:
+                    tasks.append(asyncio.to_thread(fire_detector.detect, frame))
 
-                if model_choice in ["fire_smoke", "both"]:
-                    f_res = fire_detector.detect(frame)
-                    if f_res.get("detected"):
-                        detections.append({
-                            "type": f_res["type"],
-                            "confidence": f_res["confidence"],
-                            "bbox": f_res.get("bbox"),
-                            "label": f_res.get("label"),
-                            "timestamp": now_str
-                        })
+                if tasks:
+                    results = await asyncio.gather(*tasks)
+                    for res in results:
+                        if res.get("detected"):
+                            detections.append({
+                                "type": res["type"],
+                                "confidence": res["confidence"],
+                                "bbox": res.get("bbox"),
+                                "label": res.get("label"),
+                                "timestamp": now_str
+                            })
 
                 # Feed into live incident deduplicator and rolling buffer
                 incident_mgr.process_frame(frame, detections)

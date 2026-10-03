@@ -24,6 +24,63 @@ def save_snapshot(frame: np.ndarray, prefix: str = "snap") -> str:
     return path
 
 
+def draw_bounding_box(
+    frame: np.ndarray,
+    bbox: Optional[List[int]],
+    label: str,
+    confidence: float,
+    color: Optional[Tuple[int, int, int]] = None
+) -> np.ndarray:
+    """
+    Draw a bounding box with label tag badge and confidence percentage on an OpenCV BGR frame.
+    Returns an annotated copy of the frame.
+    """
+    if frame is None or frame.size == 0:
+        return frame
+
+    annotated = frame.copy()
+    h, w = annotated.shape[:2]
+
+    if not bbox:
+        bbox = [int(w * 0.1), int(h * 0.1), int(w * 0.9), int(h * 0.9)]
+
+    xmin, ymin, xmax, ymax = [int(v) for v in bbox]
+    xmin, ymin = max(0, xmin), max(0, ymin)
+    xmax, ymax = min(w - 1, xmax), min(h - 1, ymax)
+
+    if color is None:
+        lbl_upper = label.upper()
+        if "FIRE" in lbl_upper or "SMOKE" in lbl_upper:
+            color = (0, 0, 238)  # Red for Fire/Smoke
+        else:
+            color = (0, 165, 255)  # Amber/Orange for Waste Bin
+
+    thickness = max(2, int(min(w, h) * 0.005))
+    cv2.rectangle(annotated, (xmin, ymin), (xmax, ymax), color, thickness)
+
+    conf_pct = int(round(confidence * 100)) if confidence <= 1.0 else int(confidence)
+    text = f"{label} {conf_pct}%"
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = max(0.5, min(w, h) * 0.001)
+    font_thickness = max(1, int(font_scale * 2))
+
+    (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+
+    badge_ymin = max(0, ymin - text_h - 12)
+    badge_ymax = ymin
+    badge_xmax = min(w, xmin + text_w + 16)
+
+    cv2.rectangle(annotated, (xmin, badge_ymin), (badge_xmax, badge_ymax), color, -1)
+
+    text_x = xmin + 8
+    text_y = badge_ymax - 6
+    cv2.putText(annotated, text, (text_x, text_y), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
+
+    return annotated
+
+
+
 def frames_to_video(
     frames: List[np.ndarray],
     fps: int = 15,
